@@ -9,13 +9,13 @@ const char *vertSource = R"(
 const char *fragSource = R"(
 @FRAG_SHADER@)";
 
-class GreenTriangleApp : public glApp
+class CarMap : public glApp
 {
 	GPUProgram *gpuProgram = nullptr; // csúcspont és pixel árnyalók
 
 public:
 	// glApp::glApp(unsigned int _majorNumber, unsigned int _minorNumber, unsigned int _windowWidth, unsigned int _windowHeight, const char * _windowCaption) {
-	GreenTriangleApp() : glApp(3,3,1920-300,1080-300,"Green triangle") {}
+	CarMap() : glApp(3, 3, 1920 - 300, 1080 - 300, "Car Map") {}
 
 	// Inicializáció,
 	void onInitialization()
@@ -26,8 +26,8 @@ public:
 	// Ablak rjrarajzols (drawing)
 	void onDisplay()
 	{
-		glClearColor(0, 0, 0, 0);	  // backrgound color
-		glClear(GL_COLOR_BUFFER_BIT); // clear buffer
+		glClearColor(0.55f, 0.7f, 0.9f, 1.0f); // backrgound color
+		glClear(GL_COLOR_BUFFER_BIT);		   // clear buffer
 
 		// Fix rendering off screen
 		ImGuiIO &io = ImGui::GetIO();
@@ -47,4 +47,4 @@ public:
 	}
 };
 
-GreenTriangleApp app;
+CarMap app;

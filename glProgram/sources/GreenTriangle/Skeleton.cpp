@@ -1,62 +1,48 @@
-//TITLE//
+// TITLE//
 #include "framework.h"
 
 // csúcspont árnyaló
-const char * vertSource = R"(
+const char *vertSource = R"(
 @VERT_SHADER@)";
 
 // pixel árnyaló
-const char * fragSource = R"(
+const char *fragSource = R"(
 @FRAG_SHADER@)";
 
-const int winWidth = 600, winHeight = 600;
+class GreenTriangleApp : public glApp
+{
+	GPUProgram *gpuProgram = nullptr; // csúcspont és pixel árnyalók
 
-class GreenTriangleApp : public glApp {
-	Geometry<vec2>* triangle = nullptr;  // geometria
-	Geometry<vec2>* points = nullptr;
-	GPUProgram* gpuProgram = nullptr;	 // csúcspont és pixel árnyalók
 public:
-	GreenTriangleApp() : glApp("Green triangle") { }
+	// glApp::glApp(unsigned int _majorNumber, unsigned int _minorNumber, unsigned int _windowWidth, unsigned int _windowHeight, const char * _windowCaption) {
+	GreenTriangleApp() : glApp(3,3,1920-300,1080-300,"Green triangle") {}
 
-	// Inicializáció, 
-	void onInitialization() {
-		triangle = new Geometry<vec2>;
-		triangle->Vtx() = { vec2(-0.8f, -0.8f), vec2(-0.6f, 1.0f), vec2(0.8f, -0.2f) };
-		triangle->updateGPU();
-		points = new Geometry<vec2>;
+	// Inicializáció,
+	void onInitialization()
+	{
 		gpuProgram = new GPUProgram(vertSource, fragSource);
-
-		glPointSize(10.0f);
 	}
 
 	// Ablak rjrarajzols (drawing)
-	void onDisplay() {
-		glClearColor(0, 0, 0, 0);     // backrgound color
+	void onDisplay()
+	{
+		glClearColor(0, 0, 0, 0);	  // backrgound color
 		glClear(GL_COLOR_BUFFER_BIT); // clear buffer
-		
+
 		// Fix rendering off screen
-		ImGuiIO& io = ImGui::GetIO();
+		ImGuiIO &io = ImGui::GetIO();
 		int fb_width = (int)(io.DisplaySize.x * io.DisplayFramebufferScale.x);
 		int fb_height = (int)(io.DisplaySize.y * io.DisplayFramebufferScale.y);
 		glViewport(0, 0, fb_width, fb_height);
-		
-		triangle->Draw(gpuProgram, GL_TRIANGLES, vec3(0.0f, 1.0f, 0.0f));
-		points->Draw(gpuProgram, GL_POINTS, vec3(1.0f, 0.0f, 0.0f));
 	}
 
-	virtual void onMousePressed(MouseButton but, int pX, int pY) {
-		if (but == MOUSE_LEFT) {
-			float x = 2.0f * pX / winWidth - 1.0f;
-			float y = 1.0f - 2.0f * pY / winHeight;
-			points->Vtx().push_back(vec2(x, y));
-			points->updateGPU();
-		}
-		refreshScreen();
-	}
+	// virtual void onMousePressed(MouseButton but, int pX, int pY) {
 
-	void onGui() override {
-		ImGui::Begin("ImGui Test Window");
-		ImGui::Text("Hello from ImGui in Grafika!");
+	// }
+
+	void onGui() override
+	{
+		ImGui::Begin("Settings");
 		ImGui::End();
 	}
 };

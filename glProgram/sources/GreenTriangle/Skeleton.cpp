@@ -1,5 +1,6 @@
 // TITLE//
 #include "framework.h"
+#include <random>
 
 // csúcspont árnyaló
 const char *vertSource = R"(
@@ -8,6 +9,8 @@ const char *vertSource = R"(
 // pixel árnyaló
 const char *fragSource = R"(
 @FRAG_SHADER@)";
+
+static unsigned int g_seed = 0;
 
 // Quintic Interpolation curve (improved perlin noise), Fade Function (aka smootherstep, "smoothstep"), éles átmenet elkerülése érdekében
 float smootherstep(float t) { return t * t * t * (t * (t * 6.0f - 15.0f) + 10.0f); }
@@ -19,7 +22,7 @@ float lerp(float a, float b, float t) { return a + t * (b - a); }
 // Bit Mixer algoritmus
 static unsigned int hash2(int x, int y)
 {
-	unsigned int h = (unsigned int)(x * 73856093 ^ y * 19349663); // Primes for hashing
+	unsigned int h = (unsigned int)(x * 73856093 ^ y * 19349663) + g_seed * 2654435761u; // Primes for hashing
 
 	// Avalanche effect, good distribution
 	h ^= h >> 16;
@@ -108,6 +111,8 @@ public:
 	// Inicializáció,
 	void onInitialization()
 	{
+		g_seed = std::random_device{}(); // random seed for noise
+
 		gpuProgram = new GPUProgram(vertSource, fragSource);
 	}
 
@@ -139,6 +144,17 @@ public:
 				static int mapHeight = 256;
 				static float scale = 30.0f;
 				static bool updateTexture = true;
+
+				if (ImGui::Button("Randomize Seed"))
+				{
+					g_seed = std::random_device{}();
+					updateTexture = true;
+				}
+
+				ImGui::SameLine();
+
+				if (ImGui::InputScalar("Seed", ImGuiDataType_U32, &g_seed))
+					updateTexture = true;
 
 				if (ImGui::SliderFloat("Noise Scale", &scale, 1.0f, 50.0f))
 					updateTexture = true;
@@ -172,7 +188,7 @@ public:
 				// FBM visualization
 				{
 					static Texture *noiseTex = nullptr;
-					
+
 					static float amp = 0.5f, freq = 1.0f;
 					if (ImGui::SliderFloat("FBM Amplitude", &amp, 0.1f, 1.0f))
 						updateTexture = true;

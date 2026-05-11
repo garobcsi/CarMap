@@ -449,6 +449,8 @@ public:
 		glBindTexture(GL_TEXTURE_2D, textureId);    // ez az akt�v innent�l
 	}
 
+	unsigned int getId() const { return textureId; }
+
 	void Bind(int textureUnit) {
 		glActiveTexture(GL_TEXTURE0 + textureUnit); // aktiv�l�s
 		glBindTexture(GL_TEXTURE_2D, textureId); // piros ny�l

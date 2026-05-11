@@ -131,6 +131,80 @@ public:
 	void onGui() override
 	{
 		ImGui::Begin("Settings");
+
+		{
+			if (ImGui::CollapsingHeader("Math visualization", ImGuiTreeNodeFlags_DefaultOpen))
+			{
+				static int mapWidth = 256;
+				static int mapHeight = 256;
+				static float scale = 30.0f;
+				static bool updateTexture = true;
+
+				if (ImGui::SliderFloat("Noise Scale", &scale, 1.0f, 50.0f))
+					updateTexture = true;
+
+				// Perlin noise visualization
+				{
+					static Texture *noiseTex = nullptr;
+
+					if (updateTexture)
+					{
+						if (!noiseTex)
+							noiseTex = new Texture(mapWidth, mapHeight);
+
+						std::vector<vec3> image(mapWidth * mapHeight);
+						for (int y = 0; y < mapHeight; y++)
+							for (int x = 0; x < mapWidth; x++)
+							{
+								float v = (perlin2(x / (float)mapWidth * scale, y / (float)mapHeight * scale) + 1.0f) * 0.5f;
+								image[y * mapWidth + x] = vec3(v, v, v);
+							}
+
+						noiseTex->updateTexture(mapWidth, mapHeight, image);
+					}
+
+					if (noiseTex)
+					{
+						ImGui::Image((void *)(intptr_t)noiseTex->getId(), ImVec2((float)mapWidth, (float)mapHeight));
+					}
+				}
+
+				// FBM visualization
+				{
+					static Texture *noiseTex = nullptr;
+					
+					static float amp = 0.5f, freq = 1.0f;
+					if (ImGui::SliderFloat("FBM Amplitude", &amp, 0.1f, 1.0f))
+						updateTexture = true;
+					if (ImGui::SliderFloat("FBM Frequency", &freq, 0.1f, 10.0f))
+						updateTexture = true;
+
+					if (updateTexture)
+					{
+						if (!noiseTex)
+							noiseTex = new Texture(mapWidth, mapHeight);
+
+						std::vector<vec3> image(mapWidth * mapHeight);
+						for (int y = 0; y < mapHeight; y++)
+							for (int x = 0; x < mapWidth; x++)
+							{
+								float v = (fbm(x / (float)mapWidth * scale, y / (float)mapHeight * scale, amp, freq) + 1.0f) * 0.5f;
+								image[y * mapWidth + x] = vec3(v, v, v);
+							}
+
+						noiseTex->updateTexture(mapWidth, mapHeight, image);
+					}
+
+					if (noiseTex)
+					{
+						ImGui::Image((void *)(intptr_t)noiseTex->getId(), ImVec2((float)mapWidth, (float)mapHeight));
+					}
+				}
+
+				updateTexture = false;
+			}
+		}
+
 		ImGui::End();
 	}
 };

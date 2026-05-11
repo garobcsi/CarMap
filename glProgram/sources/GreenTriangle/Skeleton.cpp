@@ -105,22 +105,22 @@ class CarMap : public glApp
 	GPUProgram *gpuProgram = nullptr; // csúcspont és pixel árnyalók
 
 public:
-	// glApp::glApp(unsigned int _majorNumber, unsigned int _minorNumber, unsigned int _windowWidth, unsigned int _windowHeight, const char * _windowCaption) {
+	// glApp::glApp(unsigned int _majorNumber, unsigned int _minorNumber, unsigned int _windowWidth, unsigned int _windowHeight, const char * _windowCaption)
 	CarMap() : glApp(3, 3, 1920 - 300, 1080 - 300, "Car Map") {}
 
-	// Inicializáció,
+	// Inicializáció
 	void onInitialization()
 	{
 		g_seed = std::random_device{}(); // random seed for noise
 
 		gpuProgram = new GPUProgram(vertSource, fragSource);
+		glClearColor(0.55f, 0.7f, 0.9f, 1.0f); // backrgound color
 	}
 
 	// Ablak rjrarajzols (drawing)
 	void onDisplay()
 	{
-		glClearColor(0.55f, 0.7f, 0.9f, 1.0f); // backrgound color
-		glClear(GL_COLOR_BUFFER_BIT);		   // clear buffer
+		glClear(GL_COLOR_BUFFER_BIT); // clear buffer
 
 		// Fix rendering off screen
 		ImGuiIO &io = ImGui::GetIO();
@@ -136,6 +136,20 @@ public:
 	void onGui() override
 	{
 		ImGui::Begin("Settings");
+
+		{
+			if (ImGui::CollapsingHeader("World Settings", ImGuiTreeNodeFlags_DefaultOpen))
+			{
+				// background color
+				static float bgColor[3] = {0.55f, 0.7f, 0.9f};
+				if (ImGui::ColorEdit3("Background Color", bgColor))
+				{
+					glClearColor(bgColor[0], bgColor[1], bgColor[2], 1.0f);
+				}
+			}
+		}
+
+		ImGui::Separator();
 
 		{
 			if (ImGui::CollapsingHeader("Math visualization", ImGuiTreeNodeFlags_DefaultOpen))

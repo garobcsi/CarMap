@@ -3,6 +3,7 @@
 #include <random>
 #include <mutex>
 #include <algorithm>
+#include <optional>
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 
@@ -212,6 +213,13 @@ class Map : Geometry<vec3>
 {
 	Noise *noise = nullptr;
 
+	inline vec2 snapToGrid(const vec2 &pos)
+	{
+		return vec2(
+			floorf(pos.x / cellSize + 0.5f) * cellSize,
+			floorf(pos.y / cellSize + 0.5f) * cellSize);
+	}
+
 public:
 	int gridSize = 128;
 	float cellSize = 0.18f;
@@ -219,20 +227,22 @@ public:
 	float noiseScale = 0.08f;
 	float heightScale = 2.2f;
 
-	vec2 *lastVec = nullptr;
+	std::optional<vec2> lastVec = std::nullopt;
 
 	Texture *noiseTex = nullptr;
 
 	void buildTerrain(const vec2 &center)
 	{
+		vec2 snappedCenter = snapToGrid(center);
+
 		std::vector<vec3> heights(gridSize * gridSize);
 		float half = (gridSize - 1) * 0.5f;
 		for (int z = 0; z < gridSize; z++)
 		{
 			for (int x = 0; x < gridSize; x++)
 			{
-				float wx = center.x + (x - half) * cellSize;
-				float wz = center.y + (z - half) * cellSize;
+				float wx = snappedCenter.x + (x - half) * cellSize;
+				float wz = snappedCenter.y + (z - half) * cellSize;
 				float h = (noise->fbm(wx * noiseScale, wz * noiseScale) * heightScale);
 
 				heights[z * gridSize + x] = vec3(h, h, h);
@@ -253,10 +263,10 @@ public:
 				int i01 = (z + 1) * gridSize + x;
 				int i11 = (z + 1) * gridSize + (x + 1);
 
-				float wx0 = center.x + (x - half) * cellSize;
-				float wx1 = center.x + (x + 1 - half) * cellSize;
-				float wz0 = center.y + (z - half) * cellSize;
-				float wz1 = center.y + (z + 1 - half) * cellSize;
+				float wx0 = snappedCenter.x + (x - half) * cellSize;
+				float wx1 = snappedCenter.x + (x + 1 - half) * cellSize;
+				float wz0 = snappedCenter.y + (z - half) * cellSize;
+				float wz1 = snappedCenter.y + (z + 1 - half) * cellSize;
 
 				vec3 v00(wx0, heights[i00].x, wz0);
 				vec3 v10(wx1, heights[i10].x, wz0);
@@ -280,10 +290,12 @@ public:
 
 	void Draw(GPUProgram *prog, vec2 pos, vec3 color)
 	{
-		if (!lastVec || *lastVec != pos)
+		vec2 snapped = snapToGrid(pos);
+
+		if (!lastVec || lastVec != snapped)
 		{
-			buildTerrain(pos);
-			lastVec = new vec2(pos);
+			buildTerrain(snapped);
+			lastVec = vec2(snapped);
 		}
 		Geometry::Draw(prog, GL_TRIANGLES, color);
 	}

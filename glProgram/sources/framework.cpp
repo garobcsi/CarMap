@@ -140,11 +140,11 @@ int main(void) {
 			ImGui_ImplGlfw_NewFrame();
 			ImGui::NewFrame();
 			
+			pApp->onDisplay();       // rajzolas
+			
 			pApp->onGui(); // Draw custom GUI
 			
 			ImGui::Render();
-
-			pApp->onDisplay();       // rajzolas
 			
 			ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 			

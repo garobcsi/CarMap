@@ -1,10 +1,12 @@
-	#version 330
-    precision highp float;
+#version 330
+precision highp float;
 
-	uniform vec3 color;			// konstans szín
-	out vec4 fragmentColor;		// pixel szín
+in float vHeight;
 
-	void main() {
-		fragmentColor = vec4(color, 1); // RGB -> RGBA
-	}
+uniform vec3 color;
+out vec4 fragmentColor;
+
+void main(){
+	fragmentColor=vec4(color * vHeight,1.);
+}
 

@@ -1,8 +1,12 @@
-	#version 330				
-    precision highp float;
+#version 330
+precision highp float;
 
-	layout(location = 0) in vec2 cP;	// 0. bemeneti regiszter
+layout(location=0)in vec3 aPos;
 
-	void main() {
-		gl_Position = vec4(cP.x, cP.y, 0, 1); 	// bemenet már normalizált eszközkoordinátákban
-	}
+uniform mat4 MVP;
+out float vHeight;
+
+void main(){
+	vHeight=aPos.y;
+	gl_Position=MVP*vec4(aPos,1.);
+}

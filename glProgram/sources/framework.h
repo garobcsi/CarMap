@@ -52,6 +52,12 @@ namespace glm {
 		vec2 operator*(const vec2& v) const { return vec2(x * v.x, y * v.y); }
 		vec2 operator-() const { return vec2(-x, -y); }
 		void operator+=(const vec2& v) { x += v.x; y += v.y; }
+		bool operator==(const vec2& v) const { 
+			return fabsf(x - v.x) < 1e-6f && fabsf(y - v.y) < 1e-6f; 
+		}
+		bool operator!=(const vec2& v) const { 
+			return fabsf(x - v.x) >= 1e-6f || fabsf(y - v.y) >= 1e-6f; 
+		}
 	};
 
 	inline float dot(const vec2& v1, const vec2& v2) {

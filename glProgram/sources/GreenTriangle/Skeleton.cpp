@@ -529,14 +529,17 @@ public:
 						0.0f);
 	}
 
-	void handleKeyboard(float dt)
+	void animate(float dt, bool enableInput)
 	{
 		// throttle, brake
 		float throttle = 0.0f;
-		if (pollKey(GLFW_KEY_W))
-			throttle += 1.0f;
-		if (pollKey(GLFW_KEY_S))
-			throttle -= 1.0f;
+		if (enableInput)
+		{
+			if (pollKey(GLFW_KEY_W))
+				throttle += 1.0f;
+			if (pollKey(GLFW_KEY_S))
+				throttle -= 1.0f;
+		}
 
 		if (throttle > 0.0f)
 			speed += accel * throttle * dt;
@@ -548,10 +551,13 @@ public:
 
 		// steering
 		float steerInput = 0.0f;
-		if (pollKey(GLFW_KEY_A))
-			steerInput -= 1.0f;
-		if (pollKey(GLFW_KEY_D))
-			steerInput += 1.0f;
+		if (enableInput)
+		{
+			if (pollKey(GLFW_KEY_A))
+				steerInput -= 1.0f;
+			if (pollKey(GLFW_KEY_D))
+				steerInput += 1.0f;
+		}
 
 		float speedAbs = fabsf(speed);
 		float steerScale = 1.0f - 0.35f * fminf(speedAbs / maxSpeed, 1.0f);
@@ -760,15 +766,11 @@ public:
 	void onTimeElapsed(float startTime, float endTime) override
 	{
 		float dt = endTime - startTime;
+		car->animate(dt, !freeCamMode);
 		if (!freeCamMode)
-		{
-			car->handleKeyboard(dt);
 			carCam->follow(*car, dt);
-		}
 		else
-		{
 			freeCam->handleKeyboard(dt);
-		}
 	}
 
 	void onMousePressed(MouseButton but, int pX, int pY) override
@@ -871,8 +873,6 @@ public:
 				unsigned int stepFast = 100;
 				if (ImGui::InputScalar("Noise Seed", ImGuiDataType_U32, &noise->seed, &step, &stepFast, "%u"))
 					terrainDirty = true;
-				
-
 
 				if (ImGui::Button("Random Seed"))
 				{

@@ -1,7 +1,6 @@
 // TITLE//
 #include "framework.h"
 #include <random>
-#include <mutex>
 #include <algorithm>
 #include <optional>
 #define GLFW_INCLUDE_NONE
@@ -16,9 +15,12 @@ const char *fragSource = R"(
 @FRAG_SHADER@)";
 
 static int g_fbWidth = 800, g_fbHeight = 600;
+static const float kPi = (float)M_PI;
 
 class Noise
 {
+
+protected:
 	unsigned int seed = 0;
 
 	// Quintic Interpolation curve (improved perlin noise), Fade Function (aka smootherstep, "smoothstep"), éles átmenet elkerülése érdekében
@@ -117,10 +119,11 @@ public:
 
 class Camera
 {
-public:
+
+protected:
 	vec3 position = vec3(0.0f, 6.0f, 12.0f);
 	// left right rotation
-	float yaw = -M_PI / 2.0f;
+	float yaw = -kPi / 2.0f;
 	// up down rotation
 	float pitch = -0.2f;
 	float fov = 45.0f;
@@ -144,14 +147,14 @@ public:
 
 	void rotateDelta(int dx, int dy)
 	{
-		yaw = fmodf(yaw + dx * mouseSensitivity, 2.0f * (float)M_PI);
+		yaw = fmodf(yaw + dx * mouseSensitivity, 2.0f * kPi);
 		pitch = std::clamp(pitch - dy * mouseSensitivity, -1.4f, 1.4f);
 	}
 
 public:
 	mat4 projection() const
 	{
-		return perspective(fov * (float)M_PI / 180.0f, (float)g_fbWidth / (float)g_fbHeight, nearPlane, farPlane);
+		return perspective(fov * kPi / 180.0f, (float)g_fbWidth / (float)g_fbHeight, nearPlane, farPlane);
 	}
 	mat4 view() const
 	{
@@ -211,51 +214,47 @@ public:
 
 class Map : Geometry<vec3>
 {
+
+protected:
 	Noise *noise = nullptr;
 
-	inline vec2 snapToGrid(const vec2 &pos)
-	{
-		return vec2(
-			floorf(pos.x / cellSize + 0.5f) * cellSize,
-			floorf(pos.y / cellSize + 0.5f) * cellSize);
-	}
-
-public:
 	int gridSize = 128;
 	float cellSize = 0.18f;
 
 	float noiseScale = 0.08f;
 	float heightScale = 2.2f;
 
-	std::optional<vec2> lastVec = std::nullopt;
+	std::optional<vec2> lastCenter = std::nullopt;
 
 	Texture *noiseTex = nullptr;
 
+	vec2 snapToGrid(const vec2 &pos) const
+	{
+		return vec2(
+			floorf(pos.x / cellSize + 0.5f) * cellSize,
+			floorf(pos.y / cellSize + 0.5f) * cellSize);
+	}
+
 	void buildTerrain(const vec2 &center)
 	{
-		vec2 snappedCenter = snapToGrid(center);
+		vec2 snapped = snapToGrid(center);
+		float half = (gridSize - 1) * 0.5f;
 
 		std::vector<vec3> heights(gridSize * gridSize);
-		float half = (gridSize - 1) * 0.5f;
 		for (int z = 0; z < gridSize; z++)
-		{
 			for (int x = 0; x < gridSize; x++)
 			{
-				float wx = snappedCenter.x + (x - half) * cellSize;
-				float wz = snappedCenter.y + (z - half) * cellSize;
-				float h = (noise->fbm(wx * noiseScale, wz * noiseScale) * heightScale);
-
+				float wx = snapped.x + (x - half) * cellSize;
+				float wz = snapped.y + (z - half) * cellSize;
+				float h = heightAt(wx, wz);
 				heights[z * gridSize + x] = vec3(h, h, h);
 			}
-		}
-
 		noiseTex->updateTexture(gridSize, gridSize, heights);
 
 		auto &vtx = this->Vtx();
 		vtx.clear();
 		vtx.reserve((gridSize - 1) * (gridSize - 1) * 6);
 		for (int z = 0; z < gridSize - 1; z++)
-		{
 			for (int x = 0; x < gridSize - 1; x++)
 			{
 				int i00 = z * gridSize + x;
@@ -263,10 +262,10 @@ public:
 				int i01 = (z + 1) * gridSize + x;
 				int i11 = (z + 1) * gridSize + (x + 1);
 
-				float wx0 = snappedCenter.x + (x - half) * cellSize;
-				float wx1 = snappedCenter.x + (x + 1 - half) * cellSize;
-				float wz0 = snappedCenter.y + (z - half) * cellSize;
-				float wz1 = snappedCenter.y + (z + 1 - half) * cellSize;
+				float wx0 = snapped.x + (x - half) * cellSize;
+				float wx1 = snapped.x + (x + 1 - half) * cellSize;
+				float wz0 = snapped.y + (z - half) * cellSize;
+				float wz1 = snapped.y + (z + 1 - half) * cellSize;
 
 				vec3 v00(wx0, heights[i00].x, wz0);
 				vec3 v10(wx1, heights[i10].x, wz0);
@@ -281,21 +280,25 @@ public:
 				vtx.push_back(v11);
 				vtx.push_back(v01);
 			}
-		}
 		this->updateGPU();
 	}
 
 public:
 	Map(Noise *noise) : noise(noise), noiseTex(new Texture(gridSize, gridSize)) {}
 
+	float heightAt(float x, float z) const
+	{
+		return noise->fbm(x * noiseScale, z * noiseScale) * heightScale;
+	}
+
 	void Draw(GPUProgram *prog, vec2 pos, vec3 color)
 	{
 		vec2 snapped = snapToGrid(pos);
 
-		if (!lastVec || lastVec != snapped)
+		if (!lastCenter || *lastCenter != snapped)
 		{
 			buildTerrain(snapped);
-			lastVec = vec2(snapped);
+			lastCenter = snapped;
 		}
 		Geometry::Draw(prog, GL_TRIANGLES, color);
 	}
@@ -306,8 +309,7 @@ public:
 
 class CarMap : public glApp
 {
-	GPUProgram *gpuProgram = nullptr; // csúcspont és pixel árnyalók
-
+	GPUProgram *gpuProgram = nullptr;
 	Noise *noise = nullptr;
 	Camera *camera = nullptr;
 	Map *map = nullptr;
@@ -316,8 +318,7 @@ public:
 	// glApp::glApp(unsigned int _majorNumber, unsigned int _minorNumber, unsigned int _windowWidth, unsigned int _windowHeight, const char * _windowCaption)
 	CarMap() : glApp(3, 3, 1920 - 300, 1080 - 300, "Car Map") {}
 
-	// Inicializáció
-	void onInitialization()
+	void onInitialization() override
 	{
 		noise = new Noise(std::random_device{}());
 		camera = new Camera();
@@ -329,8 +330,7 @@ public:
 		glEnable(GL_DEPTH_TEST);
 	}
 
-	// Ablak rjrarajzols (drawing)
-	void onDisplay()
+	void onDisplay() override
 	{
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -347,23 +347,23 @@ public:
 			map->Draw(gpuProgram, vec2(camPos.x, camPos.z), vec3(1.0f, 1.0f, 1.0f));
 	}
 
-	void onTimeElapsed(float startTime, float endTime)
+	void onTimeElapsed(float startTime, float endTime) override
 	{
 		float dt = endTime - startTime;
 		camera->handleKeyboard(dt);
 	}
 
-	void onMousePressed(MouseButton but, int pX, int pY)
+	void onMousePressed(MouseButton but, int pX, int pY) override
 	{
 		camera->handleMousePress(but, pX, pY);
 	}
 
-	void onMouseReleased(MouseButton but, int, int)
+	void onMouseReleased(MouseButton but, int, int) override
 	{
 		camera->handleMouseRelease(but);
 	}
 
-	void onMouseMotion(int pX, int pY)
+	void onMouseMotion(int pX, int pY) override
 	{
 		camera->handleMouseMove(pX, pY);
 	}

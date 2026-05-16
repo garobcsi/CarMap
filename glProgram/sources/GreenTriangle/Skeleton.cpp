@@ -307,6 +307,7 @@ public:
 	int getSize() const { return gridSize; }
 	Texture *getNoiseTexture() const { return noiseTex; }
 	vec2 getCenter() const { return lastCenter.value_or(vec2(0, 0)); }
+	void invalidate() { lastCenter = std::nullopt; }
 };
 
 class CarBody
@@ -608,11 +609,13 @@ public:
 
 	vec3 getPosition() const { return position; }
 	float getYaw() const { return yaw; }
+	float getSpeed() const { return speed; }
 	float getCarHeight() const { return body->carHeight; }
 	vec2 getPosition2D() const { return vec2(position.x, position.z); }
+	CarBody *getBody() { return body; }
 };
 
-class CarCamera : Camera
+class CarCamera : public Camera
 {
 
 public:
@@ -845,25 +848,143 @@ public:
 		}
 
 		{
+			ImGui::SetNextWindowPos(ImVec2((float)g_fbWidth - 330.0f, 0.0f), ImGuiCond_Once);
+			ImGui::SetNextWindowSize(ImVec2(320.0f, (float)g_fbHeight * 0.65f), ImGuiCond_Once);
 			ImGui::Begin("Settings");
+
+			// World & Terrain
+			if (ImGui::CollapsingHeader("World & Terrain", ImGuiTreeNodeFlags_DefaultOpen))
 			{
-				if (ImGui::CollapsingHeader("World Settings", ImGuiTreeNodeFlags_DefaultOpen))
+				static float bgColor[3] = {0.55f, 0.7f, 0.9f};
+				if (ImGui::ColorEdit3("Sky Color", bgColor))
+					glClearColor(bgColor[0], bgColor[1], bgColor[2], 1.0f);
+
+				ImGui::Separator();
+
+				bool terrainDirty = false;
+				terrainDirty |= ImGui::SliderFloat("Noise Scale", &map->noiseScale, 0.01f, 0.4f, "%.3f");
+				terrainDirty |= ImGui::SliderFloat("Height Scale", &map->heightScale, 0.1f, 12.0f, "%.2f");
+				terrainDirty |= ImGui::SliderInt("Grid Size", &map->gridSize, 16, 512);
+				terrainDirty |= ImGui::SliderFloat("Cell Size", &map->cellSize, 0.03f, 0.6f, "%.3f");
+
+				unsigned int step = 1;
+				unsigned int stepFast = 100;
+				if (ImGui::InputScalar("Noise Seed", ImGuiDataType_U32, &noise->seed, &step, &stepFast, "%u"))
+					terrainDirty = true;
+				
+
+
+				if (ImGui::Button("Random Seed"))
 				{
-					// background color
-					static float bgColor[3] = {0.55f, 0.7f, 0.9f};
-					if (ImGui::ColorEdit3("Background Color", bgColor))
-					{
-						glClearColor(bgColor[0], bgColor[1], bgColor[2], 1.0f);
-					}
+					noise->seed = std::random_device{}();
+					terrainDirty = true;
 				}
-				if (ImGui::CollapsingHeader("Camera Settings", ImGuiTreeNodeFlags_DefaultOpen))
-				{
-					if (ImGui::Checkbox("Free Cam Mode", &freeCamMode))
-					{
-						freeCam->setPosition(carCam->getPosition());
-					}
-				}
+				if (terrainDirty)
+					map->invalidate();
 			}
+
+			// Car Physics
+			if (ImGui::CollapsingHeader("Car Physics", ImGuiTreeNodeFlags_DefaultOpen))
+			{
+				ImGui::SliderFloat("Max Speed", &car->maxSpeed, 1.0f, 40.0f, "%.1f");
+				ImGui::SliderFloat("Max Reverse", &car->maxReverse, -20.0f, -0.5f, "%.1f");
+				ImGui::SliderFloat("Acceleration", &car->accel, 1.0f, 30.0f, "%.1f");
+				ImGui::SliderFloat("Brake Force", &car->brakeForce, 1.0f, 30.0f, "%.1f");
+				ImGui::SliderFloat("Drag", &car->drag, 0.1f, 10.0f, "%.2f");
+				ImGui::SliderFloat("Turn Rate", &car->turnRate, 0.1f, 5.0f, "%.2f");
+				ImGui::SliderFloat("Max Steer Angle", &car->maxSteerAngle, 0.1f, 1.5f, "%.2f");
+			}
+
+			// Car Body Dimensions
+			if (ImGui::CollapsingHeader("Car Body Dimensions"))
+			{
+				CarBody *b = car->getBody();
+				ImGui::SliderFloat("Car Length", &b->carLength, 0.5f, 5.0f, "%.2f");
+				ImGui::SliderFloat("Car Width", &b->carWidth, 0.3f, 3.0f, "%.2f");
+				ImGui::SliderFloat("Car Height", &b->carHeight, 0.1f, 2.0f, "%.2f");
+				ImGui::SliderFloat("Cab Length", &b->cabLength, 0.1f, 2.5f, "%.2f");
+				ImGui::SliderFloat("Cab Width", &b->cabWidth, 0.1f, 2.0f, "%.2f");
+				ImGui::SliderFloat("Cab Height", &b->cabHeight, 0.05f, 1.0f, "%.2f");
+				ImGui::SliderFloat("Wheel Radius", &b->wheelRadius, 0.05f, 0.8f, "%.2f");
+				ImGui::SliderFloat("Wheel Width", &b->wheelWidth, 0.05f, 0.6f, "%.2f");
+				ImGui::SliderFloat("Wheel Base", &b->wheelBase, 0.3f, 3.5f, "%.2f");
+				ImGui::SliderFloat("Track Width", &b->trackWidth, 0.3f, 2.5f, "%.2f");
+				ImGui::SliderFloat("Car Clearance", &b->carClearance, 0.0f, 0.5f, "%.3f");
+			}
+
+			// Car Camera
+			if (ImGui::CollapsingHeader("Car Camera", ImGuiTreeNodeFlags_DefaultOpen))
+			{
+				if (ImGui::Checkbox("Free Cam Mode", &freeCamMode))
+					freeCam->setPosition(carCam->getPosition());
+
+				ImGui::SliderFloat("Follow Dist", &carCam->followDistance, 1.0f, 25.0f, "%.1f");
+				ImGui::SliderFloat("Follow Height", &carCam->followHeight, 0.3f, 12.0f, "%.1f");
+				ImGui::SliderFloat("Look Ahead", &carCam->lookAheadDist, 0.0f, 8.0f, "%.1f");
+				ImGui::SliderFloat("Sharpness", &carCam->sharpness, 0.5f, 20.0f, "%.1f");
+				ImGui::SliderFloat("Cam FOV##cc", &carCam->fov, 10.0f, 120.0f, "%.1f deg");
+				ImGui::SliderFloat("Near Plane##cc", &carCam->nearPlane, 0.01f, 2.0f, "%.3f");
+				ImGui::SliderFloat("Far Plane##cc", &carCam->farPlane, 10.0f, 2000.0f, "%.0f");
+			}
+
+			// Free Camera
+			if (ImGui::CollapsingHeader("Free Camera"))
+			{
+				ImGui::SliderFloat("Move Speed##fc", &freeCam->moveSpeed, 0.5f, 80.0f, "%.1f");
+				ImGui::SliderFloat("Sensitivity##fc", &freeCam->mouseSensitivity, 0.0005f, 0.02f, "%.4f");
+				ImGui::SliderFloat("FOV##fc", &freeCam->fov, 10.0f, 120.0f, "%.1f deg");
+				ImGui::SliderFloat("Near Plane##fc", &freeCam->nearPlane, 0.01f, 2.0f, "%.3f");
+				ImGui::SliderFloat("Far Plane##fc", &freeCam->farPlane, 10.0f, 2000.0f, "%.0f");
+			}
+
+			ImGui::End();
+		}
+
+		{
+			ImGui::SetNextWindowPos(ImVec2((float)g_fbWidth - 330.0f, (float)g_fbHeight * 0.67f), ImGuiCond_Once);
+			ImGui::SetNextWindowSize(ImVec2(320.0f, (float)g_fbHeight * 0.33f), ImGuiCond_Once);
+			ImGui::Begin("Debug Info");
+
+			ImGuiIO &io = ImGui::GetIO();
+			ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.4f, 1.0f),
+							   "FPS: %.1f  (%.2f ms/frame)", io.Framerate, 1000.0f / io.Framerate);
+			ImGui::Separator();
+
+			// Minimap / Noise texture
+			Texture *noiseTex = map->getNoiseTexture();
+			ImGui::Text("Minimap Texture");
+			ImGui::SameLine();
+			if (noiseTex)
+				ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.3f, 1.0f),
+								   "ID=%u  %dx%d px", noiseTex->getId(), map->gridSize, map->gridSize);
+			else
+				ImGui::TextColored(ImVec4(1.0f, 0.3f, 0.3f, 1.0f), "null");
+
+			ImGui::Text("World span:  %.2f units  (cell=%.3f)",
+						(map->getSize() - 1) * map->cellSize, map->cellSize);
+			vec2 tc = map->getCenter();
+			ImGui::Text("Terrain center: (%.2f, %.2f)", tc.x, tc.y);
+			ImGui::Text("Noise seed:  %u", noise->seed);
+
+			ImGui::Separator();
+
+			// Car state
+			vec3 cp = car->getPosition();
+			ImGui::Text("Car pos:   (%.2f, %.2f, %.2f)", cp.x, cp.y, cp.z);
+			ImGui::Text("Car yaw:    %.3f rad  (%.1f deg)", car->getYaw(), car->getYaw() * 180.0f / kPi);
+			float spd = car->getSpeed();
+			ImGui::TextColored(fabsf(spd) > 0.05f ? ImVec4(1.0f, 0.7f, 0.2f, 1.0f) : ImVec4(0.6f, 0.6f, 0.6f, 1.0f),
+							   "Car speed:  %.2f m/s  (%.1f km/h)", spd, spd * 3.6f);
+
+			ImGui::Separator();
+
+			// Active camera position
+			vec3 activeCamPos = freeCamMode ? freeCam->getPosition() : carCam->getPosition();
+			const char *camLabel = freeCamMode ? "FreeCam" : "CarCam ";
+			ImGui::Text("%s pos: (%.2f, %.2f, %.2f)", camLabel,
+						activeCamPos.x, activeCamPos.y, activeCamPos.z);
+			ImGui::Text("Mode: %s", freeCamMode ? "Free Camera" : "Car Camera");
+
 			ImGui::End();
 		}
 	}

@@ -4,6 +4,7 @@ precision highp float;
 in float vHeight;
 
 uniform vec3 color;
+uniform int isCar;
 out vec4 fragmentColor;
 
 const vec3 waterDeep=vec3(.04,.16,.38);
@@ -27,5 +28,8 @@ vec3 terrainColor(float h){
 }
 
 void main(){
+    if(isCar==1)
+    fragmentColor=vec4(color,1.);
+    else
     fragmentColor=vec4(terrainColor(vHeight)*color,1.);
 }
